@@ -1,0 +1,8 @@
+interface:
+  display_name: "Hyper Agent Executor"
+  short_description: "Manage Layer2 executor daemon and runbooks"
+  brand_color: "#0F766E"
+  default_prompt: "Use $hyper-agent-executor to check my Agent executor service and suggest the next safe operation."
+
+policy:
+  allow_implicit_invocation: true

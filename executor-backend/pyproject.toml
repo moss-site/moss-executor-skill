@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyper-agent-executor-backend"
+version = "0.1.5"
+description = "Executor backend skeleton for Hyper Agent funding, NAV, reconciliation, and redeem orchestration."
+requires-python = ">=3.11"
+dependencies = [
+  "eth-account>=0.13,<0.14",
+  "pycryptodome>=3.20,<4",
+]
+
+[project.scripts]
+hyper-agent-executor = "executor_backend.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["executor_backend*"]
+
+[tool.ruff]
+line-length = 100
