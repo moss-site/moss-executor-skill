@@ -57,7 +57,7 @@ ERR
 fi
 
 cat <<OUT
-Hyper Agent Executor backend installed.
+Hyperliquid Agent Executor backend installed.
 Runtime root:  $RUNTIME_ROOT
 Backend dir:   $INSTALL_DIR
 Python:        $INSTALL_DIR/.venv/bin/python
