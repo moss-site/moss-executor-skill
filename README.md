@@ -1,6 +1,6 @@
-# agent_marketplace_hyper_executor_skills
+# Moss Executor Skill
 
-Layer 2 service skeleton for the Hyper Agent architecture.
+Layer 2 service skeleton for the Hyperliquid Agent architecture.
 
 Terminology:
 
