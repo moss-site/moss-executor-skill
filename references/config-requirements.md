@@ -47,7 +47,7 @@ For normal testnet setup, the user only needs to provide a few values. Everythin
 一、创建 executor 服务
 请使用最新 executor skill/runtime 创建新的 executor 服务。
 
-网络：Hyper testnet
+网络：Hyperliquid testnet
 Agent 合约地址：<AGENT_ADDRESS>
 Executor 地址：<EXECUTOR_ADDRESS>
 运行模式：private_key
@@ -84,7 +84,7 @@ SIGNER_MODE=dry_run
 EXECUTOR_PRIVATE_KEY=
 ```
 
-Hyper testnet 的网络默认值可以保留在模板里。Agent/Core 常量不需要用户填，`agent-init` 会从 `AGENT_ADDRESS` 读取并写回 `config.env`：
+Hyperliquid testnet 的网络默认值可以保留在模板里。Agent/Core 常量不需要用户填，`agent-init` 会从 `AGENT_ADDRESS` 读取并写回 `config.env`：
 
 ```env
 CHAIN_ID=998
@@ -106,7 +106,7 @@ ENABLE_AUTO_CORE_WITHDRAW=false
 
 | Field | Required | Example | Meaning / Check |
 | --- | --- | --- | --- |
-| `AGENT_ADDRESS` | Yes | `0x467f0fdb95166a3248ed074f4c70aac7180f7b97` | HyperAgent contract proxy. This is also the Agent's HyperCore address/master account. |
+| `AGENT_ADDRESS` | Yes | `0x467f0fdb95166a3248ed074f4c70aac7180f7b97` | Hyperliquid Agent contract proxy. This is also the Agent's HyperCore address/master account. |
 | `EXECUTOR_ADDRESS` | Yes | `0x7419bf84a496b0Fa1C480c9F0Db71064a3543523` | Executor/API wallet address. Must match `EXECUTOR_PRIVATE_KEY` before sending. |
 
 ### 3.2 Network
@@ -253,7 +253,7 @@ acknowledgement in `config.env`.
 
 Before running any operation beyond `agent-init` and read-only checks:
 
-1. `AGENT_ADDRESS` is the expected HyperAgent proxy.
+1. `AGENT_ADDRESS` is the expected Hyperliquid Agent proxy.
 2. `EXECUTOR_ADDRESS` is the intended Executor/API wallet.
 3. `EXECUTOR_PRIVATE_KEY`, if present, derives exactly `EXECUTOR_ADDRESS`.
 4. `NETWORK`, `CHAIN_ID`, `EVM_RPC_URL`, and `HYPERCORE_API_URL` point to the same environment.

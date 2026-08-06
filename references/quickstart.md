@@ -61,7 +61,7 @@ mkdir -p ~/.moss-hyper-agent/agents/<agent-id>
 cp ~/.moss-hyper-agent/templates/env.testnet.example ~/.moss-hyper-agent/agents/<agent-id>/config.env
 ```
 
-Edit only the small user-facing section first. For normal Hyper testnet setup, keep the remaining template defaults:
+Edit only the small user-facing section first. For a normal Hyperliquid testnet setup, keep the remaining template defaults:
 
 ```text
 NETWORK=testnet
@@ -77,7 +77,7 @@ Only change RPC/Core constants or automation switches when the operator explicit
 
 Minimum setup checklist:
 
-- `AGENT_ADDRESS` is the HyperAgent proxy.
+- `AGENT_ADDRESS` is the Hyperliquid Agent proxy.
 - `EXECUTOR_ADDRESS` is the intended trading/API wallet.
 - `NETWORK`, `CHAIN_ID`, `EVM_RPC_URL`, and `HYPERCORE_API_URL` point to the same environment.
 - `ACCEPT_TOKEN` and `CORE_DEPOSIT_WALLET` match the Agent contract getters.
