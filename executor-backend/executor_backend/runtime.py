@@ -126,7 +126,7 @@ def write_config_template(paths: RuntimePaths, env: dict[str, str]) -> None:
         "REDEEM_LIQUIDITY_BUFFER_BPS",
     ]
     lines = [
-        "# Hyperliquid Agent Executor runtime config.",
+        "# Hyper Agent Executor runtime config.",
         "# Keep private keys outside git and avoid printing this file.",
     ]
     for key in keys:

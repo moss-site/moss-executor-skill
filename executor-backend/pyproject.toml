@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hyper-agent-executor-backend"
 version = "0.1.5"
-description = "Executor backend skeleton for Hyperliquid Agent funding, NAV, reconciliation, and redeem orchestration."
+description = "Executor backend skeleton for Hyper Agent funding, NAV, reconciliation, and redeem orchestration."
 requires-python = ">=3.11"
 dependencies = [
   "eth-account>=0.13,<0.14",

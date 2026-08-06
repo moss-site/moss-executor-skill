@@ -1,11 +1,11 @@
 ---
 name: hyper-agent-executor
-description: Install and operate the Hyperliquid Agent Executor backend from a packaged skill. Use when managing Hyperliquid Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
+description: Install and operate the Hyper Agent Executor backend from a packaged skill. Use when managing Hyper Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
 ---
 
-# Hyperliquid Agent Executor
+# Hyper Agent Executor
 
-Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyperliquid Agent's Executor actions.
+Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyper Agent's Executor actions.
 
 ## Operating Principles
 

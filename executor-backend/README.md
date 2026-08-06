@@ -1,6 +1,6 @@
 # Executor Backend
 
-Layer 2 service skeleton for the Hyperliquid Agent architecture.
+Layer 2 service skeleton for the Hyper Agent architecture.
 
 Terminology:
 
