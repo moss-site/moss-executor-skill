@@ -61,7 +61,7 @@ mkdir -p ~/.moss-hyper-agent/agents/<agent-id>
 cp ~/.moss-hyper-agent/templates/env.testnet.example ~/.moss-hyper-agent/agents/<agent-id>/config.env
 ```
 
-Edit only the small user-facing section first. For a normal Hyperliquid testnet setup, keep the remaining template defaults:
+Edit only the small user-facing section first. For normal Hyper testnet setup, keep the remaining template defaults:
 
 ```text
 NETWORK=testnet
@@ -77,7 +77,7 @@ Only change RPC/Core constants or automation switches when the operator explicit
 
 Minimum setup checklist:
 
-- `AGENT_ADDRESS` is the Hyperliquid Agent proxy.
+- `AGENT_ADDRESS` is the HyperAgent proxy.
 - `EXECUTOR_ADDRESS` is the intended trading/API wallet.
 - `NETWORK`, `CHAIN_ID`, `EVM_RPC_URL`, and `HYPERCORE_API_URL` point to the same environment.
 - `ACCEPT_TOKEN` and `CORE_DEPOSIT_WALLET` match the Agent contract getters.
@@ -177,12 +177,12 @@ extraAgents(AGENT_ADDRESS) contains EXECUTOR_ADDRESS
 
 ## 7. Activate the Agent HyperCore Address with External Funding
 
-Fresh Agent addresses need activation on HyperCore before trading or reliable funding flows on both testnet and mainnet. Use an external funding account, such as an operator/owner wallet, to transfer a small amount to the Agent HyperCore address. This activation transfer is not sent by `executorctl.sh`.
+Fresh Agent addresses need activation on HyperCore before trading or reliable funding flows on both testnet and mainnet. Use an external funding account, such as an operator/owner wallet, to transfer exactly `2.0 USDC` to the Agent HyperCore address. This activation transfer is not sent by `executorctl.sh`.
 
 Use native HyperCore transfer flows for activation, for example:
 
 ```text
-external funding account -> usd_transfer(small_amount, AGENT_ADDRESS)
+external funding account -> usd_transfer(2.0, AGENT_ADDRESS)
 ```
 
 or spot transfer tooling, depending on the test plan.
@@ -191,6 +191,7 @@ Important:
 
 - Native HyperCore transfers are not contract calls and are not executed by `executorctl.sh`.
 - The funding account should be outside the Agent contract; it is used only to activate/fund the Agent HyperCore address.
+- Send `2.0 USDC`, not the bare activation minimum. Activation has been observed to consume about `1 USDC`; keep the remaining approximately `1 USDC` on the Agent's HyperCore account as a withdrawal/dynamic-fee buffer (this is not HyperEVM gas in HYPE).
 - External activation/funding balances are not automatically reflected in contract accounting.
 - If external HyperCore funding is used as test funds, owner-level `syncCoreAccounting(...)` may be required before contract-gated operations such as `withdraw-core`, because `tracked_core_usdc` is not increased by native HyperCore transfers.
 - Observe HyperCore ledger / balances after transfer.
@@ -205,6 +206,15 @@ HyperEVM Agent contract USDC -> HyperCore spot account
 ```
 
 Use this only after the Agent HyperCore address has already been activated by the external transfer in step 7 and where `CoreDepositWallet.deposit(...)` is supported for the target network. Mainnet is expected to use this normal contract-driven path after activation. On current testnet, HyperEVM-to-HyperCore funding is not reliable/available for real balance tests: do not assume a successful HyperEVM receipt means HyperCore credited the Agent. For testnet funding, use the external HyperCore transfer flow in step 7 and send USDC directly to the Agent HyperCore address.
+
+The Agent default is `maxTradingBps=5000`: at most 50% of `totalManagedAssets()` may be exposed to Core. The check is cumulative, not simply 50% of the current EVM wallet balance:
+
+```text
+trackedCoreUsdc + pendingCoreDeposits + pendingCoreWithdrawals + requestedAmount
+<= totalManagedAssets() * maxTradingBps / 10_000
+```
+
+`deposit-core` now reads these values and fails locally before broadcast when the requested amount exceeds the remaining capacity. It also checks actual/accounted/unreserved EVM liquidity. The contract performs the same checks and reverts an out-of-scope execution.
 
 Dry-run:
 
@@ -335,6 +345,8 @@ Send only after review:
 ./scripts/executorctl.sh --agent 0xAgentProxy nav-cycle --day <yyyymmdd> --send
 ```
 
+After this manual send succeeds, ask whether the user wants daily automatic reporting. If yes, set `ENABLE_AUTO_NAV=true` in the Agent's `config.env` and restart the service. The switch causes the service to attempt one guarded settlement per UTC day; it does not bypass pending-Core checks, `MAX_NAV_CHANGE_BPS`, signer validation, or the mainnet process-only `ALLOW_MAINNET_SEND=true` acknowledgement.
+
 Low-level settlement is available only when an externally reviewed snapshot already exists:
 
 ```bash
@@ -386,10 +398,10 @@ Use this order for a new Agent:
 4. Verify `agent-chain-state` and `hyper-state`.
 5. Check executor permissions; if missing, ask the owner to run `setExecutor(EXECUTOR_ADDRESS, true)`, then re-check.
 6. Executor dry-runs and sends `authorize-approved` to authorize its own address as the Agent HyperCore/API trading wallet.
-7. Use an external funding account to transfer a small amount to the Agent HyperCore address for activation on both testnet and mainnet.
+7. Use an external funding account to run `usd_transfer(2.0, Agent)` for activation on both testnet and mainnet, then retain the remaining approximately 1 USDC as the withdrawal/fee buffer.
 8. Verify HyperCore ledger/balances.
-9. After activation: on testnet, continue using external HyperCore funding for real balance tests and owner-sync accounting if those externally funded balances must be withdrawn through the contract; on mainnet, if needed, run `deposit-core` and only then `confirm-core-deposit` after HyperCore evidence.
+9. After activation: retain approximately 1 USDC as the HyperCore withdrawal/fee buffer. On testnet, continue using external HyperCore funding for real balance tests and owner-sync accounting if those externally funded balances must be withdrawn through the contract; on mainnet, if needed, run the 50%-limit preflight in `deposit-core` and only then `confirm-core-deposit` after HyperCore evidence.
 10. Move spot/perp balances as needed.
 11. If funds must return to HyperEVM, run the withdrawal flow: perp -> spot if needed, `withdraw-core`, wait for HyperEVM evidence, then `confirm-withdrawal`.
-12. Run `nav-cycle` without `--send`, review the snapshot, then run `nav-cycle --send` if safe.
+12. Run `nav-cycle` without `--send`, review the snapshot, then run `nav-cycle --send` if safe; after success, offer `ENABLE_AUTO_NAV=true` and restart the service if the user approves daily automatic reporting.
 13. Start watcher only after manual flows are understood.

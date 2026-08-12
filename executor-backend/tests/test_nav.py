@@ -255,6 +255,8 @@ class NavServiceTest(unittest.TestCase):
             "0x0aa64d3d": encoded(30),
             "0xf31f268a": encoded(40),
             "0xef273a78": encoded(50),
+            "0xb66a4d98": encoded(10),
+            "0xdce77bdb": encoded(5_000),
             "0x80bc7175": encoded(20260730),
             "0xf490dd72": encoded(90),
             "0x6bddd479": encoded(1_000_000),
@@ -268,6 +270,42 @@ class NavServiceTest(unittest.TestCase):
         self.assertEqual(state.evm_idle_usdc, 1_000_100)
         self.assertEqual(state.accounted_evm_usdc, 100)
         self.assertEqual(state.unaccounted_evm_usdc, 1_000_000)
+        self.assertEqual(state.pending_mint_assets, 10)
+        self.assertEqual(state.max_trading_bps, 5_000)
+
+    def test_core_deposit_preflight_mirrors_contract_trading_limit(self) -> None:
+        agent_address = "0x0000000000000000000000000000000000000001"
+        token_address = "0x0000000000000000000000000000000000000002"
+
+        def encoded(value: int) -> str:
+            return "0x" + value.to_bytes(32, "big").hex()
+
+        responses = {
+            "0x5510f804": "0x" + "0" * 24 + token_address[2:],
+            calldata("balanceOf(address)", [("address", agent_address)]): encoded(700_000),
+            "0x2424d721": encoded(700_000),
+            "0x7dbb6d8b": encoded(0),
+            "0x25f25635": encoded(200_000),
+            "0x0aa64d3d": encoded(50_000),
+            "0xf31f268a": encoded(0),
+            "0xef273a78": encoded(0),
+            "0xb66a4d98": encoded(0),
+            "0xdce77bdb": encoded(5_000),
+            "0x80bc7175": encoded(20260805),
+            "0xf490dd72": encoded(1_000_000),
+            "0x6bddd479": encoded(1_000_000),
+            "0x5f3e364a": encoded(1_000_000),
+            "0x18160ddd": encoded(1),
+        }
+        client = AgentContractClient(agent_address=agent_address, rpc=FakeRpcClient(responses))
+
+        checks = client.core_deposit_preflight(250_000)
+
+        self.assertEqual(checks["max_core_exposure"], 500_000)
+        self.assertEqual(checks["current_core_exposure"], 250_000)
+        self.assertEqual(checks["deposit_capacity"], 250_000)
+        with self.assertRaisesRegex(ValueError, "maxTradingBps=5000"):
+            client.core_deposit_preflight(250_001)
 
     def test_settle_calldata_encodes_accounted_assets(self) -> None:
         client = AgentContractClient(

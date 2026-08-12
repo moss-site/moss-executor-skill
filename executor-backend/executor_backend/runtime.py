@@ -118,7 +118,6 @@ def write_config_template(paths: RuntimePaths, env: dict[str, str]) -> None:
         "USDC_TOKEN_INDEX",
         "USDC_SPOT_DESTINATION_DEX",
         "CORE_USDC_WEI_PER_ASSET_UNIT",
-        "EXECUTOR_AUTOMATION_MODE",
         "ENABLE_AUTO_NAV",
         "ENABLE_AUTO_CONFIRM_CORE_DEPOSIT",
         "ENABLE_AUTO_CONFIRM_CORE_WITHDRAWAL",
@@ -126,7 +125,7 @@ def write_config_template(paths: RuntimePaths, env: dict[str, str]) -> None:
         "REDEEM_LIQUIDITY_BUFFER_BPS",
     ]
     lines = [
-        "# Hyperliquid Agent Executor runtime config.",
+        "# Hyper Agent Executor runtime config.",
         "# Keep private keys outside git and avoid printing this file.",
     ]
     for key in keys:

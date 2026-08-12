@@ -47,7 +47,7 @@ For normal testnet setup, the user only needs to provide a few values. Everythin
 一、创建 executor 服务
 请使用最新 executor skill/runtime 创建新的 executor 服务。
 
-网络：Hyperliquid testnet
+网络：Hyper testnet
 Agent 合约地址：<AGENT_ADDRESS>
 Executor 地址：<EXECUTOR_ADDRESS>
 运行模式：private_key
@@ -84,7 +84,7 @@ SIGNER_MODE=dry_run
 EXECUTOR_PRIVATE_KEY=
 ```
 
-Hyperliquid testnet 的网络默认值可以保留在模板里。Agent/Core 常量不需要用户填，`agent-init` 会从 `AGENT_ADDRESS` 读取并写回 `config.env`：
+Hyper testnet 的网络默认值可以保留在模板里。Agent/Core 常量不需要用户填，`agent-init` 会从 `AGENT_ADDRESS` 读取并写回 `config.env`：
 
 ```env
 CHAIN_ID=998
@@ -106,7 +106,7 @@ ENABLE_AUTO_CORE_WITHDRAW=false
 
 | Field | Required | Example | Meaning / Check |
 | --- | --- | --- | --- |
-| `AGENT_ADDRESS` | Yes | `0x467f0fdb95166a3248ed074f4c70aac7180f7b97` | Hyperliquid Agent contract proxy. This is also the Agent's HyperCore address/master account. |
+| `AGENT_ADDRESS` | Yes | `0x467f0fdb95166a3248ed074f4c70aac7180f7b97` | HyperAgent contract proxy. This is also the Agent's HyperCore address/master account. |
 | `EXECUTOR_ADDRESS` | Yes | `0x7419bf84a496b0Fa1C480c9F0Db71064a3543523` | Executor/API wallet address. Must match `EXECUTOR_PRIVATE_KEY` before sending. |
 
 ### 3.2 Network
@@ -156,7 +156,7 @@ For first setup, keep automatic send-capable workflows disabled until read-only 
 
 | Field | Required | Recommended Setup Value | Meaning / Check |
 | --- | --- | --- | --- |
-| `ENABLE_AUTO_NAV` | Yes | `false` first, then decide | Enables automatic NAV workflow in the service loop. |
+| `ENABLE_AUTO_NAV` | Yes | `false` until a manual send succeeds | When `true`, the running service attempts at most one guarded `nav-cycle --send` per UTC day. Restart after changing it. Mainnet still needs process-only `ALLOW_MAINNET_SEND=true`. |
 | `ENABLE_AUTO_RECONCILE` | Yes | `false` first, then decide | Enables automatic reconcile workflow in the service loop. |
 | `ENABLE_AUTO_CORE_WITHDRAW` | Yes | `false` | Core withdrawal automation should stay off unless explicitly approved. |
 | `MAX_NAV_CHANGE_BPS` | Yes | `2000` | Guardrail for NAV movement; 2000 = 20%. |
@@ -253,13 +253,14 @@ acknowledgement in `config.env`.
 
 Before running any operation beyond `agent-init` and read-only checks:
 
-1. `AGENT_ADDRESS` is the expected Hyperliquid Agent proxy.
+1. `AGENT_ADDRESS` is the expected HyperAgent proxy.
 2. `EXECUTOR_ADDRESS` is the intended Executor/API wallet.
 3. `EXECUTOR_PRIVATE_KEY`, if present, derives exactly `EXECUTOR_ADDRESS`.
 4. `NETWORK`, `CHAIN_ID`, `EVM_RPC_URL`, and `HYPERCORE_API_URL` point to the same environment.
 5. Agent contract `acceptToken()` and `coreDepositWallet()` match config.
 6. `isExecutor(EXECUTOR_ADDRESS) == true`; if false, owner must run `setExecutor(EXECUTOR_ADDRESS, true)` first.
 7. Hyperliquid `userRole(EXECUTOR_ADDRESS)` shows agent role for `AGENT_ADDRESS` after `authorize-approved`.
-8. Agent HyperCore address has been activated with a small USDC transfer before Core actions.
-9. Testnet caveat: contract HyperEVM -> HyperCore deposit path may not be usable; fund the Agent HyperCore address directly for testing.
-10. `--send` is used only after dry-run output and balances/permissions are reviewed.
+8. An external funder activated the Agent HyperCore address with `usd_transfer(2.0, Agent)` and approximately 1 USDC remains as a withdrawal/fee buffer.
+9. Before `deposit-core`, verify the CLI preflight. Default `maxTradingBps=5000` permits cumulative Core exposure up to 50% of `totalManagedAssets()`, not 50% of the raw EVM wallet balance.
+10. Testnet caveat: a successful HyperEVM deposit receipt may still produce no HyperCore credit; fund directly for testing and never confirm without ledger/balance evidence.
+11. `--send` is used only after dry-run output and balances/permissions are reviewed.

@@ -475,6 +475,11 @@ def main() -> None:
             },
             "created_at": utc_now_iso(),
         }
+        if not cfg.auto_nav:
+            payload["automation_hint"] = (
+                "After validating this daily NAV flow, set ENABLE_AUTO_NAV=true and restart "
+                "the service to submit one guarded settlement per UTC day."
+            )
         write_json(snapshot_path, payload)
         append_jsonl(paths.operations, payload)
         print(json.dumps({**payload, "snapshot_path": str(snapshot_path)}, sort_keys=True, indent=2))
@@ -517,11 +522,15 @@ def main() -> None:
             requires_hypercore_verification=True,
         )
     elif args.cmd == "deposit-core":
+        try:
+            preflight = agent.core_deposit_preflight(args.amount)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         emit_tx(
             cfg=cfg,
             command="deposit-core",
-            result=agent.deposit_usdc_to_core(args.amount),
-            params={"amount": args.amount},
+            result=agent.deposit_usdc_to_core(args.amount, preflight=False),
+            params={"amount": args.amount, "preflight": preflight},
             requires_hypercore_verification=True,
         )
     elif args.cmd == "confirm-core-deposit":

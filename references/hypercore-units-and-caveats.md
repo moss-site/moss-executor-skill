@@ -49,6 +49,13 @@ Operational rule:
 - Never confirm a core deposit from HyperEVM receipt alone.
 - Confirm only after HyperCore ledger or balance proves the funds arrived.
 - Never settle NAV while `pendingCoreDeposits` or `pendingCoreWithdrawals` is non-zero.
+- Before every HyperEVM -> HyperCore deposit, respect the Agent's cumulative Core exposure limit. The default `maxTradingBps=5000` means 50% of `totalManagedAssets()`, including tracked and both pending Core directions; it is not 50% of the raw EVM token balance.
+
+Fresh-account activation rule:
+
+- Have an external funder send `usd_transfer(2.0, Agent)`.
+- Expect about 1 USDC to be consumed by activation and leave the remaining approximately 1 USDC as a HyperCore withdrawal/dynamic-fee buffer.
+- Do not call this buffer HyperEVM gas: EVM gas is paid in HYPE, while this USDC is retained for HyperCore-side costs.
 
 Spot -> HyperEVM withdrawal caveat:
 

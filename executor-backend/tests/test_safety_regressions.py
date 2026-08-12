@@ -142,6 +142,14 @@ class SafetyRegressionTest(unittest.TestCase):
             if previous is not None:
                 os.environ["DATABASE_URL"] = previous
 
+    def test_auto_nav_is_disabled_by_default(self) -> None:
+        previous = os.environ.pop("ENABLE_AUTO_NAV", None)
+        try:
+            self.assertFalse(load_config().auto_nav)
+        finally:
+            if previous is not None:
+                os.environ["ENABLE_AUTO_NAV"] = previous
+
     def test_unknown_signer_mode_is_rejected(self) -> None:
         with patched_env({"SIGNER_MODE": "send_everything"}):
             with self.assertRaisesRegex(ValueError, "unsupported SIGNER_MODE"):

@@ -27,6 +27,8 @@ KNOWN_SELECTORS = {
     "pendingCoreDeposits()": "0x0aa64d3d",
     "pendingCoreWithdrawals()": "0xf31f268a",
     "reservedRedeemAmount()": "0xef273a78",
+    "pendingMintAssets()": "0xb66a4d98",
+    "maxTradingBps()": "0xdce77bdb",
     "lastSettledDay()": "0x80bc7175",
     "lastSettledTotalAssets()": "0xf490dd72",
     "lastSettledSharePrice()": "0x6bddd479",

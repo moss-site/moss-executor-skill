@@ -27,6 +27,8 @@ class AgentChainState:
     pending_core_deposits: int
     pending_core_withdrawals: int
     reserved_redeem_amount: int
+    pending_mint_assets: int
+    max_trading_bps: int
     last_settled_day: int
     last_settled_total_assets: int
     last_settled_share_price: int
@@ -147,6 +149,8 @@ class AgentContractClient:
             pending_core_deposits=self._read_uint(self.agent_address, "pendingCoreDeposits()"),
             pending_core_withdrawals=self._read_uint(self.agent_address, "pendingCoreWithdrawals()"),
             reserved_redeem_amount=self._read_uint(self.agent_address, "reservedRedeemAmount()"),
+            pending_mint_assets=self._read_uint(self.agent_address, "pendingMintAssets()"),
+            max_trading_bps=self._read_uint(self.agent_address, "maxTradingBps()"),
             last_settled_day=self._read_uint(self.agent_address, "lastSettledDay()"),
             last_settled_total_assets=self._read_uint(self.agent_address, "lastSettledTotalAssets()"),
             last_settled_share_price=self._read_uint(self.agent_address, "lastSettledSharePrice()"),
@@ -167,8 +171,55 @@ class AgentContractClient:
         )
         return self._send_executor_tx(data)
 
-    def deposit_usdc_to_core(self, amount: int) -> TxResult:
+    def core_deposit_preflight(self, amount: int) -> dict[str, int]:
+        """Mirror the Agent's Core deposit limits before building or sending a transaction."""
+        state = self.read_chain_state()
+        total_managed_assets = state.last_settled_total_assets or (
+            state.accounted_evm_usdc
+            + state.tracked_core_usdc
+            + state.pending_core_deposits
+            + state.pending_core_withdrawals
+        )
+        max_core_exposure = total_managed_assets * state.max_trading_bps // 10_000
+        current_core_exposure = (
+            state.tracked_core_usdc
+            + state.pending_core_deposits
+            + state.pending_core_withdrawals
+        )
+        trading_capacity = max(0, max_core_exposure - current_core_exposure)
+        protected_assets = state.pending_mint_assets + state.reserved_redeem_amount
+        unreserved_evm_assets = max(0, state.accounted_evm_usdc - protected_assets)
+        deposit_capacity = min(
+            state.evm_idle_usdc,
+            state.accounted_evm_usdc,
+            unreserved_evm_assets,
+            trading_capacity,
+        )
+        checks = {
+            "amount": amount,
+            "max_trading_bps": state.max_trading_bps,
+            "total_managed_assets": total_managed_assets,
+            "max_core_exposure": max_core_exposure,
+            "current_core_exposure": current_core_exposure,
+            "trading_capacity": trading_capacity,
+            "protected_evm_assets": protected_assets,
+            "unreserved_evm_assets": unreserved_evm_assets,
+            "deposit_capacity": deposit_capacity,
+        }
+        if amount > deposit_capacity:
+            raise ValueError(
+                "Core deposit preflight failed: requested "
+                f"{amount} asset units, available {deposit_capacity}; "
+                f"maxTradingBps={state.max_trading_bps} permits total Core exposure "
+                f"{max_core_exposure}, currently {current_core_exposure}. "
+                "Reduce the amount and re-check pending/protected assets."
+            )
+        return checks
+
+    def deposit_usdc_to_core(self, amount: int, *, preflight: bool = True) -> TxResult:
         self.resolve_runtime_config()
+        if preflight:
+            self.core_deposit_preflight(amount)
         if not self.core_deposit_wallet:
             raise ValueError("CORE_DEPOSIT_WALLET is required")
         inner = calldata(

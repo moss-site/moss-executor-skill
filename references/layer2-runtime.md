@@ -27,18 +27,11 @@ Local evidence:
 └── logs/
 ```
 
-Daemon modes:
-
-| Mode | Behavior |
-| --- | --- |
-| `observe` | Read state and write reports only |
-| `assisted` | Generate reports and suggested commands; human confirms sends |
-| `auto` | Send narrowly allowed Executor transactions after checks pass |
-
-Default to `assisted`. In assisted mode the daemon writes observations and suggested commands; it does not automatically confirm deposits/withdrawals or settle NAV without an explicit `--send`.
+The default is assisted operation: the daemon reads state and writes reports, while transaction commands require explicit `--send`. `ENABLE_AUTO_NAV=true` is the one supported send-capable daemon switch. After the service is restarted, it attempts at most one `nav-cycle --send` per UTC day. It still fails closed on pending Core accounting, excessive NAV change, missing/mismatched signer, and missing mainnet acknowledgement.
 
 Recommended automation:
 
 - Safe: `service run-once`, `agent-chain-state`, HyperCore checks, NAV preview, reconcile reports.
-- Assisted: `nav-cycle`, `nav-settle`, `confirm-core-deposit`, `confirm-withdrawal`.
+- Optional automatic: daily `nav-cycle` only, after a successful manual cycle and explicit `ENABLE_AUTO_NAV=true`.
+- Assisted: `nav-settle`, `confirm-core-deposit`, `confirm-withdrawal`, all Core transfers.
 - Manual only: owner config, `syncCoreAccounting`, upgrades, pause/unpause.

@@ -1,11 +1,11 @@
 ---
 name: hyper-agent-executor
-description: Install and operate the Hyperliquid Agent Executor backend from a packaged skill. Use when managing Hyperliquid Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
+description: Install and operate the Hyper Agent Executor backend from a packaged skill. Use when managing Hyper Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
 ---
 
-# Hyperliquid Agent Executor
+# Hyper Agent Executor
 
-Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyperliquid Agent's Executor actions.
+Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyper Agent's Executor actions.
 
 ## Operating Principles
 
@@ -17,6 +17,8 @@ Use this skill to deploy and operate the local `executor-backend` runtime that m
 - Do not overlap a NAV snapshot with explicit Core deposit, withdrawal, or spot/perp transfer operations; HyperCore spot and perp reads are separate API snapshots.
 - For perp NAV, use HyperCore `marginSummary.accountValue`, not `withdrawable`, so open PnL and locked margin are included.
 - Do not call `confirm-core-deposit` or `confirm-withdrawal` without observed HyperCore/HyperEVM evidence.
+- Activate every new Agent HyperCore address from an external funder with `usd_transfer(2.0, AGENT_ADDRESS)`. The observed activation cost is about 1 USDC; leave the remaining approximately 1 USDC on HyperCore as a withdrawal/fee buffer.
+- Before `deposit-core`, read `maxTradingBps` and current Core exposure. The contract default is `5000` (50%); tracked Core assets plus pending deposits, pending withdrawals, and the new amount must not exceed that limit.
 - For executor key rotation, disable old contract permissions and verify Hyperliquid `extraAgents`; do not assume old API wallets are revoked by `setExecutor`.
 - Treat `syncCoreAccounting` as owner-level manual repair, not normal Executor automation.
 - For mainnet sends, restate network, Agent, Executor, target, action, and amount before sending, then set the process-only acknowledgement `ALLOW_MAINNET_SEND=true`.
@@ -134,6 +136,8 @@ NAV preview and settlement:
 ./scripts/executorctl.sh --agent 0xAgent nav-cycle --day <yyyymmdd>
 ./scripts/executorctl.sh --agent 0xAgent nav-cycle --day <yyyymmdd> --send
 ```
+
+After one manual daily cycle has been reviewed and sent successfully, offer automatic daily NAV to the user. Set `ENABLE_AUTO_NAV=true` in that Agent's `config.env` and restart the service. The service then attempts at most one `nav-cycle --send` per UTC day and still blocks on pending Core accounting, the NAV-change guard, signer checks, and mainnet acknowledgement. Do not describe this as enabled until `service status` is running with the updated config.
 
 Start/stop watcher:
 

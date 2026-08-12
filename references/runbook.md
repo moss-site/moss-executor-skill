@@ -66,6 +66,8 @@ Send only after reviewing the cycle output, snapshot hash, HyperCore state, and 
 ./scripts/executorctl.sh --agent 0xAgent nav-cycle --day <yyyymmdd> --send
 ```
 
+After a successful manual cycle, offer automatic daily NAV. Set `ENABLE_AUTO_NAV=true` in the per-Agent `config.env`, restart the service, and verify `service status`. The daemon attempts at most one settlement per UTC day. All NAV checks still apply; mainnet also requires `ALLOW_MAINNET_SEND=true` in the environment of `service start`.
+
 Low-level settle remains available when an externally reviewed snapshot is already prepared:
 
 ```bash
@@ -168,7 +170,9 @@ Use `--wallet <address>` only when Owner has explicitly approved a separate trad
 
 ## Core Deposit
 
-Fresh Agents must be activated on HyperCore before relying on contract-driven deposit flows. Testnet real funding uses native `usd_transfer` / `spot_transfer`; mainnet keeps `CoreDepositWallet.deposit(...)` as the production contract path.
+Fresh Agents must be activated on HyperCore before relying on contract-driven deposit flows. The external funder sends `usd_transfer(2.0, Agent)`: about 1 USDC may be consumed by activation, and the remaining approximately 1 USDC stays as the HyperCore withdrawal/dynamic-fee buffer. This is not HyperEVM gas. Testnet real funding uses native `usd_transfer` / `spot_transfer`; mainnet keeps `CoreDepositWallet.deposit(...)` as the production contract path.
+
+Default `maxTradingBps=5000` limits cumulative Core exposure to 50% of `totalManagedAssets()`. `deposit-core` preflights `trackedCoreUsdc + pendingCoreDeposits + pendingCoreWithdrawals + amount` against that limit and checks unreserved EVM liquidity. Reduce the amount if the local check fails; do not try to bypass it because the contract will reject the same out-of-scope call.
 
 Dry-run first:
 

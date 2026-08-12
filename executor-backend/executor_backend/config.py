@@ -117,7 +117,7 @@ def load_config() -> AppConfig:
             timeout_seconds=int(os.getenv("DELEVERAGE_REQUEST_TIMEOUT_SECONDS", "3600")),
         ),
         database_url=os.getenv("DATABASE_URL", f"sqlite:///executor-{network_name}.db"),
-        auto_nav=_bool("ENABLE_AUTO_NAV", True),
+        auto_nav=_bool("ENABLE_AUTO_NAV", False),
         auto_reconcile=_bool("ENABLE_AUTO_RECONCILE", True),
         auto_core_withdraw=_bool("ENABLE_AUTO_CORE_WITHDRAW", False),
         max_nav_change_bps=int(os.getenv("MAX_NAV_CHANGE_BPS", "2000")),

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from datetime import UTC, datetime
 import os
 import signal
 import subprocess
 import sys
 import time
+from typing import Any
 
 from executor_backend.chain.client import AgentContractClient
 from executor_backend.chain.rpc import JsonRpcClient
@@ -81,6 +82,7 @@ def init_agent_runtime(cfg: AppConfig) -> RuntimePaths:
 def run_once(cfg: AppConfig) -> dict[str, Any]:
     paths = RuntimePaths.from_agent(cfg.agent.agent_address)
     paths.ensure()
+    previous = read_json(paths.last_seen)
     hyper = HyperCoreClient(cfg.network.hypercore_api_url)
     state = hyper.fetch_state(cfg.agent.agent_address)
     chain_state = None
@@ -94,13 +96,21 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
     except Exception as exc:  # keep watcher alive when RPC reads are temporarily unavailable
         chain_error = str(exc)
     suggested_actions = []
+    auto_nav_result = None
     if cfg.auto_nav and chain_state is not None:
+        auto_nav_result = run_auto_nav_if_due(
+            cfg,
+            chain_state,
+            previous_result=previous.get("auto_nav_result"),
+        )
+    elif not cfg.auto_nav:
         suggested_actions.append(
             {
-                "type": "nav_cycle",
-                "mode": os.getenv("EXECUTOR_AUTOMATION_MODE", "assisted"),
-                "command": "PYTHONPATH=. python -m executor_backend.cli nav-cycle",
-                "send_command": "PYTHONPATH=. python -m executor_backend.cli nav-cycle --send",
+                "type": "enable_auto_nav",
+                "message": (
+                    "After reviewing a successful daily nav-cycle, set ENABLE_AUTO_NAV=true "
+                    "and restart the service to submit one guarded NAV settlement per UTC day."
+                ),
             }
         )
     if cfg.auto_reconcile and chain_state is not None:
@@ -120,8 +130,9 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
         "type": "run_once",
         "agent_address": cfg.agent.agent_address,
         "network": cfg.network.name,
-        "automation_mode": os.getenv("EXECUTOR_AUTOMATION_MODE", "assisted"),
+        "automation_mode": "automatic" if cfg.auto_nav else "assisted",
         "auto_nav": cfg.auto_nav,
+        "auto_nav_result": auto_nav_result,
         "auto_reconcile": cfg.auto_reconcile,
         "hypercore": dataclass_dict(state),
         "agent_chain_state": chain_state.to_dict() if chain_state is not None else None,
@@ -129,7 +140,6 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
         "suggested_actions": suggested_actions,
         "checked_at": utc_now_iso(),
     }
-    previous = read_json(paths.last_seen)
     report["previous_checked_at"] = previous.get("checked_at")
     write_json(paths.last_seen, report)
     write_json(
@@ -144,6 +154,80 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
     )
     append_jsonl(paths.operations, report)
     return report
+
+
+def run_auto_nav_if_due(
+    cfg: AppConfig,
+    chain_state,
+    *,
+    day: int | None = None,
+    previous_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Submit at most one guarded NAV settlement for each UTC calendar day."""
+    target_day = day or int(datetime.now(UTC).strftime("%Y%m%d"))
+    if chain_state.last_settled_day == 0:
+        return {
+            "status": "blocked",
+            "day": target_day,
+            "error": "initial NAV settlement must be reviewed and sent manually",
+        }
+    if chain_state.last_settled_day == target_day:
+        return {"status": "already_settled", "day": target_day}
+    if (
+        previous_result
+        and previous_result.get("day") == target_day
+        and previous_result.get("status")
+        in {"submitted", "unknown", "awaiting_chain_confirmation"}
+    ):
+        return {
+            "status": "awaiting_chain_confirmation",
+            "day": target_day,
+            "previous_status": previous_result["status"],
+        }
+    if chain_state.last_settled_day > target_day:
+        return {
+            "status": "blocked",
+            "day": target_day,
+            "error": f"lastSettledDay {chain_state.last_settled_day} is ahead of UTC day",
+        }
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "executor_backend.cli",
+        "nav-cycle",
+        "--day",
+        str(target_day),
+        "--send",
+    ]
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=os.getcwd(),
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "unknown",
+            "day": target_day,
+            "error": "nav-cycle timed out; verify chain state manually before retrying",
+        }
+    if completed.returncode != 0:
+        return {
+            "status": "failed",
+            "day": target_day,
+            "exit_code": completed.returncode,
+            "error": (completed.stderr or completed.stdout).strip()[-2000:],
+        }
+    return {
+        "status": "submitted",
+        "day": target_day,
+        "output": completed.stdout.strip()[-4000:],
+    }
 
 
 def loop(cfg: AppConfig, interval: int) -> None:

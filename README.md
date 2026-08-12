@@ -1,6 +1,6 @@
-# Moss Executor Skill
+# Executor Backend
 
-Layer 2 service skeleton for the Hyperliquid Agent architecture.
+Layer 2 service skeleton for the Hyper Agent architecture.
 
 Terminology:
 
@@ -102,6 +102,8 @@ PYTHONPATH=. AGENT_ADDRESS=0xAgentProxy python -m executor_backend.cli nav-cycle
 
 `nav-cycle` reads raw, accounted, and unaccounted Agent HyperEVM USDC plus HyperCore spot and perp account value state, writes a snapshot under `~/.moss-hyper-agent/agents/<agent-id>/nav_snapshots/`, and returns the `settleDailyNav` calldata. Settlement uses `accountedEvmUsdc`, not the raw token balance; raw/gross values remain diagnostic only. The contract subtracts `pendingMintAssets + reservedRedeemAmount` internally for active share pricing. NAV settlement is blocked while either Core deposit or withdrawal accounting is pending, because observed HyperCore balances cannot safely distinguish in-transit funds from already-applied or silently failed actions. Use `--send` only after reviewing the snapshot and NAV change guard.
 
+After one manual `nav-cycle --send` succeeds, set `ENABLE_AUTO_NAV=true` and restart the service to enable daily automatic reporting. The service attempts at most one settlement per UTC day and uses the same pending-Core, NAV-change, signer, and mainnet-send checks. A failed check is recorded and does not bypass the guard.
+
 Mainnet broadcasts additionally require the exact process environment acknowledgement `ALLOW_MAINNET_SEND=true`. Unknown `NETWORK` values fail closed instead of defaulting to mainnet.
 
 Keep local network configs separate: source `.env_excuter_testnet` for testnet and
@@ -109,7 +111,7 @@ Keep local network configs separate: source `.env_excuter_testnet` for testnet a
 the whole file. The mainnet template starts in `dry_run`; switch to `private_key`
 only after the deployed Agent, Executor permission, and derived signer address are verified.
 
-Before using funding commands on a fresh Agent, activate the Agent proxy on HyperCore with a native transfer, for example `usd_transfer(2.0, AgentProxy)`. This is not a contract call and is usually performed by the operator/owner funding account. The activation balance is external to contract accounting until HyperCore state is observed and the Owner intentionally syncs it with `syncCoreAccounting(...)`.
+Before using funding commands on a fresh Agent, have the operator/owner funder activate the Agent proxy on HyperCore with `usd_transfer(2.0, AgentProxy)`. Activation has been observed to consume about 1 USDC; leave the remaining approximately 1 USDC on HyperCore as a withdrawal/dynamic-fee buffer. This USDC is not HyperEVM gas in HYPE. The activation balance is external to contract accounting until HyperCore state is observed and the Owner intentionally syncs it with `syncCoreAccounting(...)`.
 
 Start / stop the lightweight daemon:
 
@@ -133,7 +135,7 @@ Generate calldata without sending:
 PYTHONPATH=. AGENT_ADDRESS=0x0000000000000000000000000000000000000001 python -m executor_backend.cli deposit-core --amount 1000000
 ```
 
-`deposit-core` is for moving Agent HyperEVM USDC into an already activated HyperCore account on networks where the bridge-style deposit path is supported. Mainnet keeps this as the intended contract-driven funding path. On testnet, do not expect `CoreDepositWallet.deposit(...)` to credit HyperCore; use native HyperCore `usd_transfer` / `spot_transfer` to fund real Core-balance tests. A HyperEVM receipt only proves the deposit wallet call succeeded; it does not prove HyperCore credited spot/perp balance. Never run `confirm-core-deposit` until HyperCore ledger or spot balance shows the funds.
+`deposit-core` is for moving Agent HyperEVM USDC into an already activated HyperCore account on networks where the bridge-style deposit path is supported. It preflights the contract's trading limit and EVM liquidity. The default `maxTradingBps=5000` permits cumulative Core exposure up to 50% of `totalManagedAssets()`; tracked Core assets, pending deposits, pending withdrawals, and the requested amount all count. Exceeding the remaining capacity fails locally and would also revert in the contract. Mainnet keeps this as the intended contract-driven funding path. On testnet, do not expect `CoreDepositWallet.deposit(...)` to credit HyperCore; use native HyperCore `usd_transfer` / `spot_transfer` to fund real Core-balance tests. A HyperEVM receipt only proves the deposit wallet call succeeded; it does not prove HyperCore credited spot/perp balance. Never run `confirm-core-deposit` until HyperCore ledger or spot balance shows the funds.
 
 Authorize the default collapsed-role trading wallet. When `--wallet` is omitted,
 the CLI uses `EXECUTOR_ADDRESS`, which the Agent auto-approves through `setExecutor`:
