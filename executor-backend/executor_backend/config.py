@@ -51,6 +51,7 @@ class AppConfig:
     auto_core_withdraw: bool
     max_nav_change_bps: int
     redeem_liquidity_buffer_bps: int
+    nav_perp_dexes: tuple[str, ...]
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -63,6 +64,19 @@ def _bool(name: str, default: bool) -> bool:
 def _optional_int(name: str) -> int | None:
     value = os.getenv(name)
     return None if value in {None, ""} else int(value)
+
+
+def _nav_perp_dexes() -> tuple[str, ...]:
+    values = tuple(
+        value.strip()
+        for value in os.getenv("NAV_PERP_DEXS", "main,xyz").split(",")
+        if value.strip()
+    )
+    if not values or "main" not in values:
+        raise ValueError("NAV_PERP_DEXS must include main")
+    if len(values) != len(set(values)):
+        raise ValueError("NAV_PERP_DEXS cannot contain duplicate dex names")
+    return values
 
 
 def load_config() -> AppConfig:
@@ -122,4 +136,5 @@ def load_config() -> AppConfig:
         auto_core_withdraw=_bool("ENABLE_AUTO_CORE_WITHDRAW", False),
         max_nav_change_bps=int(os.getenv("MAX_NAV_CHANGE_BPS", "2000")),
         redeem_liquidity_buffer_bps=int(os.getenv("REDEEM_LIQUIDITY_BUFFER_BPS", "100")),
+        nav_perp_dexes=_nav_perp_dexes(),
     )

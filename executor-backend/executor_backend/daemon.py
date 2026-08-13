@@ -83,7 +83,7 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
     paths = RuntimePaths.from_agent(cfg.agent.agent_address)
     paths.ensure()
     previous = read_json(paths.last_seen)
-    hyper = HyperCoreClient(cfg.network.hypercore_api_url)
+    hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
     state = hyper.fetch_state(cfg.agent.agent_address)
     chain_state = None
     chain_error = None
@@ -126,6 +126,8 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
                 ),
             }
         )
+    hypercore_state = dataclass_dict(state)
+    hypercore_state["total_perp_account_value"] = state.total_perp_account_value
     report = {
         "type": "run_once",
         "agent_address": cfg.agent.agent_address,
@@ -134,7 +136,7 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
         "auto_nav": cfg.auto_nav,
         "auto_nav_result": auto_nav_result,
         "auto_reconcile": cfg.auto_reconcile,
-        "hypercore": dataclass_dict(state),
+        "hypercore": hypercore_state,
         "agent_chain_state": chain_state.to_dict() if chain_state is not None else None,
         "agent_chain_state_error": chain_error,
         "suggested_actions": suggested_actions,

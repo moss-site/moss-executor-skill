@@ -51,14 +51,14 @@ class NavService:
         settled_total_assets = (
             accounted_evm_usdc
             + state.spot_usdc
-            + state.perp_account_value
+            + state.total_perp_account_value
         )
         if settled_total_assets < 0:
             raise ValueError("HyperCore losses exceed accounted assets; NAV cannot be negative")
         observed_gross_total_assets = (
             evm_idle_usdc
             + state.spot_usdc
-            + state.perp_account_value
+            + state.total_perp_account_value
         )
         payload = {
             "agent_address": agent_address,
@@ -71,10 +71,14 @@ class NavService:
             "hypercore_spot_usdc": state.spot_usdc,
             "hypercore_perp_account_value": state.perp_account_value,
             "hypercore_perp_withdrawable": state.perp_withdrawable,
+            "hypercore_total_perp_account_value": state.total_perp_account_value,
+            "hypercore_perp_accounts": {
+                dex: asdict(account) for dex, account in state.perp_accounts.items()
+            },
             "reserved_redeem_amount": reserved_redeem_amount,
             "pending_core_deposits": pending_core_deposits,
             "pending_core_withdrawals": pending_core_withdrawals,
-            "positions": state.positions,
+            "positions": state.all_positions,
             "ledger_items": state.ledger,
         }
         serialized_payload = json.dumps(payload, sort_keys=True).encode()

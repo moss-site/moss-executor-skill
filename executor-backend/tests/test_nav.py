@@ -4,7 +4,7 @@ import unittest
 
 from executor_backend.chain.abi import calldata
 from executor_backend.chain.client import CORE_WRITER, AgentContractClient
-from executor_backend.hyper.client import HyperCoreState
+from executor_backend.hyper.client import HyperCoreState, PerpAccountState
 from executor_backend.services.nav import NavService, nav_change_bps
 
 
@@ -100,6 +100,75 @@ class NavServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.reserved_redeem_amount, 400_000)
         self.assertEqual(snapshot.pending_core_deposits, 0)
         self.assertEqual(snapshot.pending_core_withdrawals, 0)
+
+    def test_preview_includes_xyz_account_value_and_preserves_account_breakdown(self) -> None:
+        service = NavService(
+            agent=None,
+            hypercore=FakeHyperCoreClient(
+                HyperCoreState(
+                    spot_usdc=200_000,
+                    spot_usdc_available=200_000,
+                    perp_account_value=300_000,
+                    perp_withdrawable=250_000,
+                    positions=[{"position": {"coin": "BTC"}}],
+                    ledger=[],
+                    perp_accounts={
+                        "main": PerpAccountState(
+                            account_value=300_000,
+                            withdrawable=250_000,
+                            positions=[{"position": {"coin": "BTC"}}],
+                            time=100,
+                        ),
+                        "xyz": PerpAccountState(
+                            account_value=400_000,
+                            withdrawable=350_000,
+                            positions=[{"position": {"coin": "xyz:AAPL"}}],
+                            time=101,
+                        ),
+                    },
+                )
+            ),
+        )
+
+        snapshot = service.preview(
+            agent_address="0x0000000000000000000000000000000000000001",
+            epoch_day=20260812,
+            evm_idle_usdc=1_000_000,
+            accounted_evm_usdc=900_000,
+            reserved_redeem_amount=0,
+            pending_core_withdrawals=0,
+        )
+
+        self.assertEqual(snapshot.settled_total_assets, 1_800_000)
+        self.assertEqual(snapshot.observed_gross_total_assets, 1_900_000)
+        self.assertEqual(snapshot.hypercore_perp_account_value, 300_000)
+        self.assertEqual(snapshot.hypercore_total_perp_account_value, 700_000)
+        self.assertEqual(snapshot.hypercore_perp_accounts["xyz"]["account_value"], 400_000)
+        self.assertEqual(snapshot.positions[1]["dex"], "xyz")
+
+    def test_preview_applies_xyz_losses_without_clamping_account_value(self) -> None:
+        state = HyperCoreState(
+            spot_usdc=0,
+            spot_usdc_available=0,
+            perp_account_value=300_000,
+            perp_withdrawable=0,
+            positions=[],
+            ledger=[],
+            perp_accounts={
+                "main": PerpAccountState(300_000, 0, [], None),
+                "xyz": PerpAccountState(-100_000, 0, [], None),
+            },
+        )
+        snapshot = NavService(None, FakeHyperCoreClient(state)).preview(
+            agent_address="0x0000000000000000000000000000000000000001",
+            epoch_day=20260812,
+            evm_idle_usdc=500_000,
+            accounted_evm_usdc=500_000,
+            reserved_redeem_amount=0,
+            pending_core_withdrawals=0,
+        )
+
+        self.assertEqual(snapshot.settled_total_assets, 700_000)
 
     def test_preview_rejects_pending_core_bridge_accounting(self) -> None:
         service = NavService(

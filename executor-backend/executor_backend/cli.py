@@ -342,6 +342,7 @@ def main() -> None:
                     f"agent={report['agent_address']} "
                     f"spot_usdc={state['spot_usdc']} "
                     f"perp_account_value={state['perp_account_value']} "
+                    f"total_perp_account_value={state['total_perp_account_value']} "
                     f"perp_withdrawable={state['perp_withdrawable']} "
                     f"ledger_items={len(state['ledger'])}"
                 )
@@ -350,7 +351,7 @@ def main() -> None:
         return
 
     if args.cmd == "hyper-state":
-        hyper = HyperCoreClient(cfg.network.hypercore_api_url)
+        hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
         state = hyper.fetch_state(args.user or cfg.agent.agent_address)
         print(state)
         return
@@ -364,7 +365,7 @@ def main() -> None:
         return
 
     if args.cmd == "reconcile":
-        hyper = HyperCoreClient(cfg.network.hypercore_api_url)
+        hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
         service = ReconciliationService(hyper)
         report = service.build_report(
             cfg.agent.agent_address,
@@ -406,7 +407,7 @@ def main() -> None:
         return
     if args.cmd == "nav-preview":
         agent = AgentContractClient(cfg.agent.agent_address)
-        hyper = HyperCoreClient(cfg.network.hypercore_api_url)
+        hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
         nav = NavService(agent, hyper)
         snapshot = nav.preview(
             cfg.agent.agent_address,
@@ -428,7 +429,7 @@ def main() -> None:
         day = args.day or int(datetime.now(UTC).strftime("%Y%m%d"))
         agent = build_agent_client(dry_run=not args.send, with_rpc=True)
         chain_state = agent.read_chain_state()
-        hyper = HyperCoreClient(cfg.network.hypercore_api_url)
+        hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
         nav = NavService(agent, hyper)
         snapshot = nav.preview(
             cfg.agent.agent_address,

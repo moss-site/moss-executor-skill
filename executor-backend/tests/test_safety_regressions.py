@@ -5,6 +5,7 @@ import unittest
 from contextlib import contextmanager
 from decimal import Decimal
 from typing import Iterator
+from unittest.mock import patch
 
 from executor_backend.config import load_config
 from executor_backend.cli import (
@@ -196,6 +197,67 @@ class SafetyRegressionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-object"):
             client.fetch_state("0x0000000000000000000000000000000000000001")
 
+    def test_hypercore_fetches_main_and_xyz_perp_accounts(self) -> None:
+        class MultiDexClient(HyperCoreClient):
+            def __init__(self):
+                super().__init__("https://example.invalid", ("main", "xyz"))
+                self.payloads = []
+
+            def post_info(self, payload):
+                self.payloads.append(payload)
+                if payload["type"] == "clearinghouseState":
+                    value = "3" if payload.get("dex") == "xyz" else "2"
+                    return {
+                        "marginSummary": {"accountValue": value},
+                        "withdrawable": value,
+                        "assetPositions": [],
+                        "time": 123,
+                    }
+                if payload["type"] == "spotClearinghouseState":
+                    return {"balances": []}
+                return []
+
+        client = MultiDexClient()
+        state = client.fetch_state("0x0000000000000000000000000000000000000001")
+
+        clearing_payloads = [
+            payload for payload in client.payloads if payload["type"] == "clearinghouseState"
+        ]
+        self.assertEqual(clearing_payloads[0].get("dex"), None)
+        self.assertEqual(clearing_payloads[1]["dex"], "xyz")
+        self.assertEqual(state.perp_account_value, 2_000_000)
+        self.assertEqual(state.total_perp_account_value, 5_000_000)
+
+    def test_nav_perp_dex_config_defaults_and_validation(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(load_config().nav_perp_dexes, ("main", "xyz"))
+        with patch.dict(os.environ, {"NAV_PERP_DEXS": "main,xyz,cash"}, clear=True):
+            self.assertEqual(load_config().nav_perp_dexes, ("main", "xyz", "cash"))
+        with patch.dict(os.environ, {"NAV_PERP_DEXS": "main,VOLMEX"}, clear=True):
+            self.assertEqual(load_config().nav_perp_dexes, ("main", "VOLMEX"))
+        with patch.dict(os.environ, {"NAV_PERP_DEXS": "xyz"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "must include main"):
+                load_config()
+
+    def test_hypercore_xyz_schema_mismatch_fails_closed(self) -> None:
+        class InvalidXyzClient(HyperCoreClient):
+            def post_info(self, payload):
+                if payload["type"] == "clearinghouseState":
+                    if payload.get("dex") == "xyz":
+                        return {"marginSummary": {}, "assetPositions": []}
+                    return {
+                        "marginSummary": {"accountValue": "0"},
+                        "assetPositions": [],
+                    }
+                if payload["type"] == "spotClearinghouseState":
+                    return {"balances": []}
+                return []
+
+        with self.assertRaisesRegex(ValueError, r"clearinghouseState\[xyz\]"):
+            InvalidXyzClient("https://example.invalid", ("main", "xyz")).fetch_state(
+                "0x0000000000000000000000000000000000000001"
+            )
+
     def test_hypercore_missing_account_value_fails_closed(self) -> None:
         class MissingAccountValueClient(HyperCoreClient):
             def clearinghouse_state(self, user):
@@ -207,7 +269,7 @@ class SafetyRegressionTest(unittest.TestCase):
             def user_non_funding_ledger_updates(self, user, start_time=None):
                 return []
 
-        client = MissingAccountValueClient("https://example.invalid")
+        client = MissingAccountValueClient("https://example.invalid", ("main",))
         with self.assertRaisesRegex(ValueError, "marginSummary.accountValue"):
             client.fetch_state("0x0000000000000000000000000000000000000001")
 
@@ -225,7 +287,7 @@ class SafetyRegressionTest(unittest.TestCase):
             def user_non_funding_ledger_updates(self, user, start_time=None):
                 return []
 
-        client = MissingBalancesClient("https://example.invalid")
+        client = MissingBalancesClient("https://example.invalid", ("main",))
         with self.assertRaisesRegex(ValueError, "missing balances"):
             client.fetch_state("0x0000000000000000000000000000000000000001")
 
@@ -248,7 +310,7 @@ class SafetyRegressionTest(unittest.TestCase):
             def user_non_funding_ledger_updates(self, user, start_time=None):
                 return []
 
-        state = SpotBalanceClient("https://example.invalid").fetch_state(
+        state = SpotBalanceClient("https://example.invalid", ("main",)).fetch_state(
             "0x0000000000000000000000000000000000000001"
         )
 

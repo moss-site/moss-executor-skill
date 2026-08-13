@@ -111,6 +111,7 @@ def write_config_template(paths: RuntimePaths, env: dict[str, str]) -> None:
         "CHAIN_ID",
         "EVM_RPC_URL",
         "HYPERCORE_API_URL",
+        "NAV_PERP_DEXS",
         "AGENT_ADDRESS",
         "EXECUTOR_ADDRESS",
         "ACCEPT_TOKEN",
@@ -125,7 +126,7 @@ def write_config_template(paths: RuntimePaths, env: dict[str, str]) -> None:
         "REDEEM_LIQUIDITY_BUFFER_BPS",
     ]
     lines = [
-        "# Hyper Agent Executor runtime config.",
+        "# Hyperliquid Agent Executor runtime config.",
         "# Keep private keys outside git and avoid printing this file.",
     ]
     for key in keys:

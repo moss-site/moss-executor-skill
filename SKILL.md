@@ -1,11 +1,11 @@
 ---
 name: hyper-agent-executor
-description: Install and operate the Hyper Agent Executor backend from a packaged skill. Use when managing Hyper Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
+description: Install and operate the Hyperliquid Agent Executor backend from a packaged skill. Use when managing Hyperliquid Agent local executor services, generating runtime config, starting/stopping the daemon, checking contract/HyperCore state, running NAV preview/settlement, reconcile, Core funding runbooks, or coordinating executor automation without requiring a full protocol repo checkout.
 ---
 
-# Hyper Agent Executor
+# Hyperliquid Agent Executor
 
-Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyper Agent's Executor actions.
+Use this skill to deploy and operate the local `executor-backend` runtime that manages a Hyperliquid Agent's Executor actions.
 
 ## Operating Principles
 
@@ -15,7 +15,7 @@ Use this skill to deploy and operate the local `executor-backend` runtime that m
 - NAV input is accounted total assets. Use `accountedEvmUsdc`, never raw Agent token balance; do not subtract `pendingMintAssets` or `reservedRedeemAmount`, because the contract excludes them internally for active-share pricing.
 - Do not settle NAV while `pendingCoreDeposits` or `pendingCoreWithdrawals` is non-zero. Verify both sides and confirm or repair accounting first.
 - Do not overlap a NAV snapshot with explicit Core deposit, withdrawal, or spot/perp transfer operations; HyperCore spot and perp reads are separate API snapshots.
-- For perp NAV, use HyperCore `marginSummary.accountValue`, not `withdrawable`, so open PnL and locked margin are included.
+- For perp NAV, sum HyperCore `marginSummary.accountValue` across the configured `NAV_PERP_DEXS` (`main,xyz` by default), not `withdrawable`, so main-contract and xyz-equity margin, open PnL, and locked margin are included.
 - Do not call `confirm-core-deposit` or `confirm-withdrawal` without observed HyperCore/HyperEVM evidence.
 - Activate every new Agent HyperCore address from an external funder with `usd_transfer(2.0, AGENT_ADDRESS)`. The observed activation cost is about 1 USDC; leave the remaining approximately 1 USDC on HyperCore as a withdrawal/fee buffer.
 - Before `deposit-core`, read `maxTradingBps` and current Core exposure. The contract default is `5000` (50%); tracked Core assets plus pending deposits, pending withdrawals, and the new amount must not exceed that limit.

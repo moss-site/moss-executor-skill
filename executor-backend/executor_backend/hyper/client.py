@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, DecimalException, ROUND_FLOOR
 from typing import Any
 from urllib import request
 import json
+
+
+@dataclass(frozen=True)
+class PerpAccountState:
+    account_value: int
+    withdrawable: int
+    positions: list[dict[str, Any]]
+    time: int | None
 
 
 @dataclass(frozen=True)
@@ -15,6 +23,23 @@ class HyperCoreState:
     perp_withdrawable: int
     positions: list[dict[str, Any]]
     ledger: list[dict[str, Any]]
+    perp_accounts: dict[str, PerpAccountState] = field(default_factory=dict)
+
+    @property
+    def total_perp_account_value(self) -> int:
+        if not self.perp_accounts:
+            return self.perp_account_value
+        return sum(account.account_value for account in self.perp_accounts.values())
+
+    @property
+    def all_positions(self) -> list[dict[str, Any]]:
+        if not self.perp_accounts:
+            return self.positions
+        return [
+            {**position, "dex": dex}
+            for dex, account in self.perp_accounts.items()
+            for position in account.positions
+        ]
 
 
 class HyperCoreClient:
@@ -23,8 +48,11 @@ class HyperCoreClient:
     Trading calls belong in Layer 3 and must not be added here.
     """
 
-    def __init__(self, api_url: str):
+    def __init__(self, api_url: str, perp_dexes: tuple[str, ...] = ("main",)):
         self.api_url = api_url.rstrip("/")
+        if not perp_dexes or "main" not in perp_dexes:
+            raise ValueError("perp_dexes must include main")
+        self.perp_dexes = perp_dexes
 
     def post_info(self, payload: dict[str, Any]) -> dict[str, Any] | list[Any]:
         req = request.Request(
@@ -36,10 +64,15 @@ class HyperCoreClient:
         with request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode())
 
-    def clearinghouse_state(self, user: str) -> dict[str, Any]:
-        data = self.post_info({"type": "clearinghouseState", "user": user})
+    def clearinghouse_state(self, user: str, dex: str = "main") -> dict[str, Any]:
+        payload = {"type": "clearinghouseState", "user": user}
+        if dex != "main":
+            payload["dex"] = dex
+        data = self.post_info(payload)
         if not isinstance(data, dict):
-            raise ValueError("HyperCore clearinghouseState returned a non-object response")
+            raise ValueError(
+                f"HyperCore clearinghouseState[{dex}] returned a non-object response"
+            )
         return data
 
     def spot_clearinghouse_state(self, user: str) -> dict[str, Any]:
@@ -60,15 +93,22 @@ class HyperCoreClient:
         return data
 
     def fetch_state(self, master_account: str) -> HyperCoreState:
-        clearing = self.clearinghouse_state(master_account)
+        clearings = {"main": self.clearinghouse_state(master_account)}
+        clearings.update(
+            {
+                dex: self.clearinghouse_state(master_account, dex)
+                for dex in self.perp_dexes
+                if dex != "main"
+            }
+        )
+        clearing = clearings["main"]
         spot = self.spot_clearinghouse_state(master_account)
         ledger = self.user_non_funding_ledger_updates(master_account)
-        margin_summary = clearing.get("marginSummary")
-        if not isinstance(margin_summary, dict) or "accountValue" not in margin_summary:
-            raise ValueError("HyperCore clearinghouseState is missing marginSummary.accountValue")
-        positions = clearing.get("assetPositions", [])
-        if not isinstance(positions, list):
-            raise ValueError("HyperCore clearinghouseState.assetPositions must be a list")
+        perp_accounts = {
+            dex: self._extract_perp_account(dex, dex_clearing)
+            for dex, dex_clearing in clearings.items()
+        }
+        main_perp = perp_accounts["main"]
         if "balances" not in spot:
             raise ValueError("HyperCore spotClearinghouseState is missing balances")
         balances = spot["balances"]
@@ -78,10 +118,33 @@ class HyperCoreClient:
         return HyperCoreState(
             spot_usdc=spot_usdc,
             spot_usdc_available=spot_usdc_available,
-            perp_account_value=self._decimal_to_usdc_units(margin_summary.get("accountValue", "0")),
-            perp_withdrawable=self._decimal_to_usdc_units(clearing.get("withdrawable", "0")),
-            positions=positions,
+            perp_account_value=main_perp.account_value,
+            perp_withdrawable=main_perp.withdrawable,
+            positions=main_perp.positions,
             ledger=ledger,
+            perp_accounts=perp_accounts,
+        )
+
+    @classmethod
+    def _extract_perp_account(cls, dex: str, clearing: dict[str, Any]) -> PerpAccountState:
+        margin_summary = clearing.get("marginSummary")
+        if not isinstance(margin_summary, dict) or "accountValue" not in margin_summary:
+            raise ValueError(
+                f"HyperCore clearinghouseState[{dex}] is missing marginSummary.accountValue"
+            )
+        positions = clearing.get("assetPositions", [])
+        if not isinstance(positions, list):
+            raise ValueError(
+                f"HyperCore clearinghouseState[{dex}].assetPositions must be a list"
+            )
+        time = clearing.get("time")
+        if time is not None and (not isinstance(time, int) or isinstance(time, bool)):
+            raise ValueError(f"HyperCore clearinghouseState[{dex}].time must be an integer")
+        return PerpAccountState(
+            account_value=cls._decimal_to_usdc_units(margin_summary["accountValue"]),
+            withdrawable=cls._decimal_to_usdc_units(clearing.get("withdrawable", "0")),
+            positions=positions,
+            time=time,
         )
 
     def is_wallet_authorized(self, master_account: str, trading_wallet: str) -> bool:

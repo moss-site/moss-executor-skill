@@ -46,6 +46,8 @@ class NavSnapshot:
     hypercore_spot_usdc: int
     hypercore_perp_account_value: int
     hypercore_perp_withdrawable: int
+    hypercore_total_perp_account_value: int
+    hypercore_perp_accounts: dict[str, Any]
     reserved_redeem_amount: int
     pending_core_deposits: int
     pending_core_withdrawals: int

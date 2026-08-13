@@ -1,6 +1,6 @@
 # Executor Backend
 
-Layer 2 service skeleton for the Hyper Agent architecture.
+Layer 2 service skeleton for the Hyperliquid Agent architecture.
 
 Terminology:
 
@@ -100,7 +100,7 @@ PYTHONPATH=. AGENT_ADDRESS=0xAgentProxy python -m executor_backend.cli agent-cha
 PYTHONPATH=. AGENT_ADDRESS=0xAgentProxy python -m executor_backend.cli nav-cycle --day 20260611
 ```
 
-`nav-cycle` reads raw, accounted, and unaccounted Agent HyperEVM USDC plus HyperCore spot and perp account value state, writes a snapshot under `~/.moss-hyper-agent/agents/<agent-id>/nav_snapshots/`, and returns the `settleDailyNav` calldata. Settlement uses `accountedEvmUsdc`, not the raw token balance; raw/gross values remain diagnostic only. The contract subtracts `pendingMintAssets + reservedRedeemAmount` internally for active share pricing. NAV settlement is blocked while either Core deposit or withdrawal accounting is pending, because observed HyperCore balances cannot safely distinguish in-transit funds from already-applied or silently failed actions. Use `--send` only after reviewing the snapshot and NAV change guard.
+`nav-cycle` reads raw, accounted, and unaccounted Agent HyperEVM USDC plus HyperCore spot and the configured perp account values (`NAV_PERP_DEXS=main,xyz` by default), writes a snapshot under `~/.moss-hyper-agent/agents/<agent-id>/nav_snapshots/`, and returns the `settleDailyNav` calldata. Settlement uses `accountedEvmUsdc`, not the raw token balance; raw/gross values remain diagnostic only. Each perp dex contributes its full `marginSummary.accountValue`, including margin and unrealized PnL. The contract subtracts `pendingMintAssets + reservedRedeemAmount` internally for active share pricing. NAV settlement is blocked while either Core deposit or withdrawal accounting is pending, because observed HyperCore balances cannot safely distinguish in-transit funds from already-applied or silently failed actions. Use `--send` only after reviewing the snapshot and NAV change guard.
 
 After one manual `nav-cycle --send` succeeds, set `ENABLE_AUTO_NAV=true` and restart the service to enable daily automatic reporting. The service attempts at most one settlement per UTC day and uses the same pending-Core, NAV-change, signer, and mainnet-send checks. A failed check is recorded and does not bypass the guard.
 
