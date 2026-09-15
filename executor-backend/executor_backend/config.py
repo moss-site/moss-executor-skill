@@ -108,7 +108,7 @@ def load_config() -> AppConfig:
             name=network_name,
             chain_id=int(os.getenv("CHAIN_ID", str(default_chain_id))),
             evm_rpc_url=os.getenv("EVM_RPC_URL", default_evm_rpc),
-            hypercore_api_url=os.getenv("HYPERCORE_API_URL", default_hyper_api),
+            hypercore_api_url=os.getenv("HYPERCORE_INFO_URL") or os.getenv("HYPERCORE_API_URL", default_hyper_api),
         ),
         agent=AgentConfig(
             agent_address=os.getenv("AGENT_ADDRESS", ""),

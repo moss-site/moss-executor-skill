@@ -159,3 +159,7 @@ PYTHONPATH=. AGENT_ADDRESS=0xAgentProxy EXECUTOR_ADDRESS=0xExecutor EXECUTOR_PRI
 ## Executor key rotation / leak response
 
 See `skill/references/runbook.md` for the operational runbook. Contract `setExecutor(old, false)` disables Agent contract permissions but does not by itself remove the old HyperCore API wallet from `extraAgents`; always verify Hyperliquid `userRole` / `extraAgents` before considering a leaked key fully revoked.
+
+## Infrastructure resilience
+
+See [read-provider override, retry behavior and watcher ledger policy](references/infra-resilience.md).
