@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 from datetime import UTC, datetime
 import os
 import signal
@@ -84,7 +86,7 @@ def run_once(cfg: AppConfig) -> dict[str, Any]:
     paths.ensure()
     previous = read_json(paths.last_seen)
     hyper = HyperCoreClient(cfg.network.hypercore_api_url, cfg.nav_perp_dexes)
-    state = hyper.fetch_state(cfg.agent.agent_address)
+    state = hyper.fetch_state(cfg.agent.agent_address, include_ledger=False)
     chain_state = None
     chain_error = None
     try:
@@ -233,6 +235,8 @@ def run_auto_nav_if_due(
 
 
 def loop(cfg: AppConfig, interval: int) -> None:
+    if interval <= 0:
+        raise ValueError("service interval must be positive")
     paths = RuntimePaths.from_agent(cfg.agent.agent_address)
     paths.ensure()
     write_json(
@@ -245,10 +249,17 @@ def loop(cfg: AppConfig, interval: int) -> None:
             "updated_at": utc_now_iso(),
         },
     )
+    # Spread launches and periodic reads across a fleet; no effect on trade risk checks.
+    time.sleep(random.uniform(0, min(30, interval)))
+    failures = 0
     while True:
+        delay = interval
         try:
             run_once(cfg)
+            failures = 0
         except Exception as exc:  # daemon should keep observing after transient API issues
+            failures += 1
+            delay = max(getattr(exc, "retry_after", 0), min(interval * 2 ** min(failures, 4), 1800))
             append_jsonl(
                 paths.operations,
                 {
@@ -269,7 +280,7 @@ def loop(cfg: AppConfig, interval: int) -> None:
                     "updated_at": utc_now_iso(),
                 },
             )
-        time.sleep(interval)
+        time.sleep(delay + random.uniform(0, min(60, delay * 0.2)))
 
 
 def start_service(cfg: AppConfig, interval: int) -> dict[str, Any]:

@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal, DecimalException, ROUND_FLOOR
 from typing import Any
-from urllib import request
-import json
+from .http import read_json
 
 
 @dataclass(frozen=True)
@@ -24,6 +23,7 @@ class HyperCoreState:
     positions: list[dict[str, Any]]
     ledger: list[dict[str, Any]]
     perp_accounts: dict[str, PerpAccountState] = field(default_factory=dict)
+    ledger_included: bool = True
 
     @property
     def total_perp_account_value(self) -> int:
@@ -50,19 +50,18 @@ class HyperCoreClient:
 
     def __init__(self, api_url: str, perp_dexes: tuple[str, ...] = ("main",)):
         self.api_url = api_url.rstrip("/")
+        from urllib.parse import urlsplit
+        parsed = urlsplit(self.api_url)
+        if (parsed.scheme not in {"http", "https"} or not parsed.netloc
+                or parsed.query or parsed.fragment
+                or parsed.path.endswith(("/info", "/hypercore"))):
+            raise ValueError("HyperCore read URL must be the native /info base URL")
         if not perp_dexes or "main" not in perp_dexes:
             raise ValueError("perp_dexes must include main")
         self.perp_dexes = perp_dexes
 
     def post_info(self, payload: dict[str, Any]) -> dict[str, Any] | list[Any]:
-        req = request.Request(
-            self.api_url + "/info",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with request.urlopen(req, timeout=30) as response:
-            return json.loads(response.read().decode())
+        return read_json(self.api_url + "/info", payload)
 
     def clearinghouse_state(self, user: str, dex: str = "main") -> dict[str, Any]:
         payload = {"type": "clearinghouseState", "user": user}
@@ -92,7 +91,7 @@ class HyperCoreClient:
             raise ValueError("HyperCore userNonFundingLedgerUpdates returned a non-list response")
         return data
 
-    def fetch_state(self, master_account: str) -> HyperCoreState:
+    def fetch_state(self, master_account: str, *, include_ledger: bool = True) -> HyperCoreState:
         clearings = {"main": self.clearinghouse_state(master_account)}
         clearings.update(
             {
@@ -103,7 +102,7 @@ class HyperCoreClient:
         )
         clearing = clearings["main"]
         spot = self.spot_clearinghouse_state(master_account)
-        ledger = self.user_non_funding_ledger_updates(master_account)
+        ledger = self.user_non_funding_ledger_updates(master_account) if include_ledger else []
         perp_accounts = {
             dex: self._extract_perp_account(dex, dex_clearing)
             for dex, dex_clearing in clearings.items()
@@ -122,6 +121,7 @@ class HyperCoreClient:
             perp_withdrawable=main_perp.withdrawable,
             positions=main_perp.positions,
             ledger=ledger,
+            ledger_included=include_ledger,
             perp_accounts=perp_accounts,
         )
 
