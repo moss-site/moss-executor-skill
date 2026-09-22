@@ -235,6 +235,52 @@ Before confirming:
 ./scripts/executorctl.sh --agent 0xAgent confirm-withdrawal --amount <asset-units> --send
 ```
 
+If `withdraw-core` fails with `InsufficientTrackedCoreAssets` (or local precheck shows `tracked_core_usdc` below requested withdrawal), use the repair flow below. NAV settlement and `settleDailyNav` do not update `trackedCoreUsdc`.
+
+1) Collect evidence and current contract accounting:
+
+```bash
+AGENT=0xAgent
+CONFIG=~/.moss-hyper-agent/agents/<agent-id>/config.env
+
+./scripts/executorctl.sh --config "$CONFIG" agent-chain-state --json | tee /tmp/agent_chain_state.json
+./scripts/executorctl.sh --config "$CONFIG" hyper-state
+```
+
+2) Owner syncs `trackedCoreUsdc` (keep pending values unchanged):
+
+```bash
+# Use the same network RPC as this Agent.
+RPC_URL=https://rpc.hyperliquid.xyz/evm
+OWNER_PRIVATE_KEY=0x...
+
+# Example: 13.8 USDC => 13_800_000 asset units.
+NEW_TRACKED_CORE_USDC=13800000
+
+PENDING_CORE_DEPOSITS=$(python -c 'import json; print(json.load(open("/tmp/agent_chain_state.json"))["pending_core_deposits"])')
+PENDING_CORE_WITHDRAWALS=$(python -c 'import json; print(json.load(open("/tmp/agent_chain_state.json"))["pending_core_withdrawals"])')
+
+cast send "$AGENT" "syncCoreAccounting(uint256,uint256,uint256)" \
+  "$NEW_TRACKED_CORE_USDC" "$PENDING_CORE_DEPOSITS" "$PENDING_CORE_WITHDRAWALS" \
+  --private-key "$OWNER_PRIVATE_KEY" --rpc-url "$RPC_URL"
+
+cast call "$AGENT" "trackedCoreUsdc()(uint256)" --rpc-url "$RPC_URL"
+```
+
+3) Executor retries withdrawal and confirms after HyperEVM arrival evidence:
+
+```bash
+./scripts/executorctl.sh --config "$CONFIG" withdraw-core --amount-usdc 13.8 --send
+
+# After HyperCore ledger completion + Agent HyperEVM USDC increase is observed:
+./scripts/executorctl.sh --config "$CONFIG" confirm-withdrawal --amount 13800000 --send
+```
+
+Notes:
+
+- `confirm-withdrawal --amount` uses asset units (1 USDC = 1,000,000), not Core spot-send wei units.
+- `syncCoreAccounting` is owner-only; executor key cannot call it.
+
 ## Reconcile
 
 Use `agent-chain-state --json` to source the contract values, then run:

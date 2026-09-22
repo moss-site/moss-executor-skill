@@ -21,6 +21,7 @@ Use this skill to deploy and operate the local `executor-backend` runtime that m
 - Before `deposit-core`, read `maxTradingBps` and current Core exposure. The contract default is `5000` (50%); tracked Core assets plus pending deposits, pending withdrawals, and the new amount must not exceed that limit.
 - For executor key rotation, disable old contract permissions and verify Hyperliquid `extraAgents`; do not assume old API wallets are revoked by `setExecutor`.
 - Treat `syncCoreAccounting` as owner-level manual repair, not normal Executor automation.
+- If `withdraw-core` is blocked by low `trackedCoreUsdc` (for example after external Core funding or realized PnL that was not contract-accounted), run this sequence: (1) executor/service verifies real HyperCore withdrawable balance, (2) Owner runs `syncCoreAccounting(...)` to set the new tracked amount, (3) executor runs `withdraw-core` then `confirm-withdrawal` after HyperEVM arrival evidence.
 - For mainnet sends, restate network, Agent, Executor, target, action, and amount before sending, then set the process-only acknowledgement `ALLOW_MAINNET_SEND=true`.
 
 ## Installed Skill Layout
@@ -153,6 +154,7 @@ Start/stop watcher:
 - For first-time setup and the full operation sequence, read `references/quickstart.md`.
 - For local runtime/service behavior, read `references/layer2-runtime.md`.
 - For exact operational commands and safety checks, read `references/runbook.md`.
+- For a customer-facing Chinese SOP for `InsufficientTrackedCoreAssets`, read `references/withdraw-core-tracked-core-repair.zh-CN.md`.
 - For HyperCore unit conversions and testnet caveats, read `references/hypercore-units-and-caveats.md`.
 
 Load only the reference needed for the user's request.

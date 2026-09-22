@@ -113,6 +113,10 @@ only after the deployed Agent, Executor permission, and derived signer address a
 
 Before using funding commands on a fresh Agent, have the operator/owner funder activate the Agent proxy on HyperCore with `usd_transfer(2.0, AgentProxy)`. Activation has been observed to consume about 1 USDC; leave the remaining approximately 1 USDC on HyperCore as a withdrawal/dynamic-fee buffer. This USDC is not HyperEVM gas in HYPE. The activation balance is external to contract accounting until HyperCore state is observed and the Owner intentionally syncs it with `syncCoreAccounting(...)`.
 
+If a Core withdrawal is blocked by `trackedCoreUsdc` (for example external Core funding or realized Core PnL was not yet reflected in contract accounting), use this sequence: verify real HyperCore withdrawable amount, have Owner run `syncCoreAccounting(newTrackedCoreUsdc, ..., ...)`, then run `withdraw-core` and `confirm-withdrawal` after HyperEVM arrival evidence. Daily NAV settlement does not update `trackedCoreUsdc`. For copy-paste commands, see `references/runbook.md` (Core Withdrawal section).
+
+For a customer-facing Chinese one-page SOP (including copy-paste commands), see `references/withdraw-core-tracked-core-repair.zh-CN.md`.
+
 Start / stop the lightweight daemon:
 
 ```bash

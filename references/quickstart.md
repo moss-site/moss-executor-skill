@@ -294,6 +294,37 @@ Then request withdrawal from HyperCore spot back to the HyperEVM Agent contract:
 ./scripts/executorctl.sh --agent 0xAgentProxy withdraw-core --amount-usdc <usdc> --send
 ```
 
+If this step is blocked by `trackedCoreUsdc` (`InsufficientTrackedCoreAssets`), run this sequence instead of forcing retries:
+
+1. Executor/service verifies real HyperCore withdrawable USDC and ledger evidence.
+2. Owner runs `syncCoreAccounting(newTrackedCoreUsdc, ..., ...)` so contract accounting matches the confirmed Core balance intended for withdrawal.
+3. Executor retries `withdraw-core`, then proceeds to `confirm-withdrawal` only after HyperEVM USDC arrival is observed.
+
+Daily NAV settlement (`settleDailyNav`) does not modify `trackedCoreUsdc`, so NAV reporting cannot unblock this withdrawal gate by itself.
+
+Minimal command template:
+
+```bash
+AGENT=0xAgentProxy
+CONFIG=~/.moss-hyper-agent/agents/<agent-id>/config.env
+RPC_URL=https://rpc.hyperliquid.xyz/evm
+OWNER_PRIVATE_KEY=0x...
+NEW_TRACKED_CORE_USDC=<asset-units>
+
+./scripts/executorctl.sh --config "$CONFIG" agent-chain-state --json | tee /tmp/agent_chain_state.json
+./scripts/executorctl.sh --config "$CONFIG" hyper-state
+
+PENDING_CORE_DEPOSITS=$(python -c 'import json; print(json.load(open("/tmp/agent_chain_state.json"))["pending_core_deposits"])')
+PENDING_CORE_WITHDRAWALS=$(python -c 'import json; print(json.load(open("/tmp/agent_chain_state.json"))["pending_core_withdrawals"])')
+
+cast send "$AGENT" "syncCoreAccounting(uint256,uint256,uint256)" \
+  "$NEW_TRACKED_CORE_USDC" "$PENDING_CORE_DEPOSITS" "$PENDING_CORE_WITHDRAWALS" \
+  --private-key "$OWNER_PRIVATE_KEY" --rpc-url "$RPC_URL"
+
+./scripts/executorctl.sh --config "$CONFIG" withdraw-core --amount-usdc <usdc> --send
+./scripts/executorctl.sh --config "$CONFIG" confirm-withdrawal --amount <asset-units> --send
+```
+
 Do not confirm immediately. Before `confirm-withdrawal`, verify:
 
 1. HyperCore withdrawal ledger / status shows completion.
