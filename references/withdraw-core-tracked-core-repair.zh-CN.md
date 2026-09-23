@@ -92,4 +92,3 @@ cast call "$AGENT" "trackedCoreUsdc()(uint256)" --rpc-url "$RPC_URL"
 
 - 问：Executor 能直接调 `syncCoreAccounting` 吗？
   - 答：不能。该函数是 Owner 权限。
-

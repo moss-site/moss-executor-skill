@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hyper-agent-executor-backend"
-version = "0.1.7"
+version = "0.1.8"
 description = "Executor backend skeleton for Hyperliquid Agent funding, NAV, reconciliation, and redeem orchestration."
 requires-python = ">=3.11"
 dependencies = [
